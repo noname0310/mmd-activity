@@ -20,7 +20,7 @@ document.body.appendChild(canvas);
 // eslint-disable-next-line @typescript-eslint/naming-convention
 declare const DISCORD_CLIENT_ID: string;
 
-let webSocketUrl = "ws://localhost:20311";
+let webSocketUrl = "ws://localhost:80";
 async function initDiscordSdk(): Promise<void> {
     const queryParams = new URLSearchParams(window.location.search);
     const isEmbedded = queryParams.get("frame_id") !== null;

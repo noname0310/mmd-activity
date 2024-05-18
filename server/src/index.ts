@@ -13,7 +13,7 @@ async function main(): Promise<void> {
         playbackRate: 1
     };
 
-    const server = new Server(20311);
+    const server = new Server(80);
 
     const clientIdMap = new WeakMap<WebSocket, number>();
     let nextClientId = 0;

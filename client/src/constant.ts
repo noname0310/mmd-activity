@@ -1,3 +1,3 @@
 export const serverUrl = {
-    url: "http://localhost:20311"
+    url: "http://localhost:80"
 };
