@@ -116,6 +116,13 @@ export class SceneBuilder implements ISceneBuilder {
         vmdLoader.loggingEnabled = true;
 
         engine.displayLoadingUI();
+        let totalProgress = this._sceneData.models.length;
+        let progressCount = 0;
+        function updateLoadingUI<T>(object: T): T {
+            progressCount += 1;
+            engine.loadingUIText = `<br/>(Loading ${progressCount}/${totalProgress})`;
+            return object;
+        }
 
         const loadTasks = [
             (async(): Promise<MmdAmmoJSPlugin> => {
@@ -148,6 +155,7 @@ export class SceneBuilder implements ISceneBuilder {
                         animationPathsList.push([cameraAnimationPath]);
                     }
                 }
+                totalProgress += animationPathsList.length;
 
                 for (const animationPaths of animationPathsList) {
                     let isBvmd = false;
@@ -163,9 +171,9 @@ export class SceneBuilder implements ISceneBuilder {
                             throw new Error("BVMD does not support multiple animations");
                         }
 
-                        mmdAnimationsPromise.push(bvmdLoader.loadAsync(animationPaths[0], animationPaths[0]));
+                        mmdAnimationsPromise.push(bvmdLoader.loadAsync(animationPaths[0], animationPaths[0]).then(updateLoadingUI));
                     } else {
-                        mmdAnimationsPromise.push(vmdLoader.loadAsync(animationPaths.join(","), animationPaths));
+                        mmdAnimationsPromise.push(vmdLoader.loadAsync(animationPaths.join(","), animationPaths).then(updateLoadingUI));
                     }
                 }
 
@@ -205,7 +213,7 @@ export class SceneBuilder implements ISceneBuilder {
                         "",
                         model.path,
                         scene
-                    ).then(result => result.meshes[0] as MmdMesh));
+                    ).then(result => updateLoadingUI(result.meshes[0] as MmdMesh)));
                 }
                 return Promise.all(modelPromises);
             })(),
@@ -291,8 +299,6 @@ export class SceneBuilder implements ISceneBuilder {
             const mmdModel = mmdRuntime.createMmdModel(modelMesh, {
                 buildPhysics: modelData.buildPhysics
             });
-            // (mmdRuntime as any)._needToInitializePhysicsModels.add(mmdModel);
-            // (mmdRuntime as any)._needToInitializePhysicsModelsBuffer.add(mmdModel);
 
             const mmdAnimation = animationMap.get(modelData.motionPaths.join(","));
             if (mmdAnimation !== undefined) {
