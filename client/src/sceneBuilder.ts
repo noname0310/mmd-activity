@@ -26,7 +26,6 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { DepthOfFieldEffectBlurLevel } from "@babylonjs/core/PostProcesses/depthOfFieldEffect";
 import { DefaultRenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline";
 import { Scene } from "@babylonjs/core/scene";
-import type { Nullable } from "@babylonjs/core/types";
 import { WaterMaterial } from "@babylonjs/materials/water/waterMaterial";
 import type { MmdAnimation } from "babylon-mmd/esm/Loader/Animation/mmdAnimation";
 import type { MmdStandardMaterialBuilder } from "babylon-mmd/esm/Loader/mmdStandardMaterialBuilder";
@@ -44,7 +43,6 @@ import { getMmdWasmInstance } from "babylon-mmd/esm/Runtime/Optimized/mmdWasmIns
 import { MmdWasmRuntime, MmdWasmRuntimeAnimationEvaluationType } from "babylon-mmd/esm/Runtime/Optimized/mmdWasmRuntime";
 import { MmdAmmoJSPlugin } from "babylon-mmd/esm/Runtime/Physics/mmdAmmoJSPlugin";
 import { MmdAmmoPhysics } from "babylon-mmd/esm/Runtime/Physics/mmdAmmoPhysics";
-import { MmdPlayerControl } from "babylon-mmd/esm/Runtime/Util/mmdPlayerControl";
 
 import ammo from "@/External/ammo.wasm";
 import type { ISceneBuilder } from "@/Shared/baseRuntime";
@@ -53,25 +51,19 @@ import { createDefaultArcRotateCamera } from "@/Util/createDefaultArcRotateCamer
 import { MmdCameraAutoFocus2 } from "@/Util/mmdCameraAutoFocus2";
 import { optimizeScene } from "@/Util/optimizeScene";
 
-export interface MmdSceneData {
-    settings: {
-        physics: boolean;
-    },
-    audio: string;
-    models: {
-        path: string;
-        motionPaths: string[];
-        buildPhysics: boolean;
-    }[],
-    cameraMotion: Nullable<string>;
-    endFrame: Nullable<number>;
-}
+import type { SceneClient } from ".";
+import { serverUrl } from "./constant";
+import { MmdPlayerControl } from "./mmdPlayerControl";
+import type { OnConnectPacket, PausePacket, PlaybackRateChangePacket, ResumePacket, SeekPacket} from "./packet";
+import {type Packet, PacketKind } from "./packet";
 
 export class SceneBuilder implements ISceneBuilder {
-    private readonly _sceneData: MmdSceneData;
+    private readonly _onConnectPacket: OnConnectPacket;
+    private readonly _sceneClient: SceneClient;
 
-    public constructor(sceneData: MmdSceneData) {
-        this._sceneData = sceneData;
+    public constructor(onConnectPacket: OnConnectPacket, sceneClient: SceneClient) {
+        this._onConnectPacket = onConnectPacket;
+        this._sceneClient = sceneClient;
     }
 
     public async build(canvas: HTMLCanvasElement, engine: AbstractEngine): Promise<Scene> {
@@ -108,7 +100,7 @@ export class SceneBuilder implements ISceneBuilder {
 
         const audioPlayer = new StreamAudioPlayer(scene);
         audioPlayer.preservesPitch = false;
-        audioPlayer.source = this._sceneData.audio;
+        audioPlayer.source = this._onConnectPacket.sceneData.audio;
 
         const bvmdLoader = new BvmdLoader(scene);
         bvmdLoader.loggingEnabled = true;
@@ -116,7 +108,7 @@ export class SceneBuilder implements ISceneBuilder {
         vmdLoader.loggingEnabled = true;
 
         engine.displayLoadingUI();
-        let totalProgress = this._sceneData.models.length;
+        let totalProgress = this._onConnectPacket.sceneData.models.length;
         let progressCount = 0;
         function updateLoadingUI<T>(object: T): T {
             progressCount += 1;
@@ -137,7 +129,7 @@ export class SceneBuilder implements ISceneBuilder {
 
                 const animationPathsList: string[][] = [];
                 {
-                    const models = this._sceneData.models;
+                    const models = this._onConnectPacket.sceneData.models;
                     const animationPathsSet = new Set<string>();
                     for (let i = 0; i < models.length; i++) {
                         const model = models[i];
@@ -150,7 +142,7 @@ export class SceneBuilder implements ISceneBuilder {
                         }
                     }
 
-                    const cameraAnimationPath = this._sceneData.cameraMotion;
+                    const cameraAnimationPath = this._onConnectPacket.sceneData.cameraMotion;
                     if (cameraAnimationPath && !animationPathsSet.has(cameraAnimationPath)) {
                         animationPathsList.push([cameraAnimationPath]);
                     }
@@ -181,12 +173,12 @@ export class SceneBuilder implements ISceneBuilder {
 
                 const mmdWasmAnimations = mmdAnimations.map(mmdAnimation => new MmdWasmAnimation(mmdAnimation, mmdWasmInstance, scene));
 
-                const mmdWasmRuntime = new MmdWasmRuntime(mmdWasmInstance, scene, this._sceneData.settings.physics ? new MmdAmmoPhysics(scene) : null);
+                const mmdWasmRuntime = new MmdWasmRuntime(mmdWasmInstance, scene, this._onConnectPacket.sceneData.settings.physics ? new MmdAmmoPhysics(scene) : null);
                 mmdWasmRuntime.loggingEnabled = true;
                 mmdWasmRuntime.evaluationType = MmdWasmRuntimeAnimationEvaluationType.Immediate;
 
-                if (this._sceneData.endFrame !== null) {
-                    mmdWasmRuntime.setManualAnimationDuration(this._sceneData.endFrame);
+                if (this._onConnectPacket.sceneData.endFrame !== null) {
+                    mmdWasmRuntime.setManualAnimationDuration(this._onConnectPacket.sceneData.endFrame);
                 } else {
                     let maxEndFrame = 0;
                     for (const mmdAnimation of mmdAnimations) {
@@ -196,10 +188,6 @@ export class SceneBuilder implements ISceneBuilder {
                 }
 
                 mmdWasmRuntime.setAudioPlayer(audioPlayer);
-
-                const mmdPlayerControl = new MmdPlayerControl(scene, mmdWasmRuntime, audioPlayer);
-                mmdPlayerControl.showPlayerControl();
-
                 mmdWasmRuntime.register(scene);
 
                 return [mmdWasmRuntime, mmdWasmAnimations];
@@ -207,7 +195,7 @@ export class SceneBuilder implements ISceneBuilder {
             (async(): Promise<MmdMesh[]> => {
                 bpmxLoader.boundingBoxMargin = 60;
                 const modelPromises: Promise<MmdMesh>[] = [];
-                for (const model of this._sceneData.models) {
+                for (const model of this._onConnectPacket.sceneData.models) {
                     modelPromises.push(SceneLoader.ImportMeshAsync(
                         undefined,
                         "",
@@ -222,7 +210,7 @@ export class SceneBuilder implements ISceneBuilder {
                 const skyboxMaterial = new StandardMaterial("skyBox", scene);
                 skyboxMaterial.backFaceCulling = false;
                 await new Promise<void>(resolve => {
-                    skyboxMaterial.reflectionTexture = new CubeTexture("res/stage/beach/TropicalSunnyDay", scene, undefined, undefined, undefined, () => resolve());
+                    skyboxMaterial.reflectionTexture = new CubeTexture(`${serverUrl}/stage/beach/TropicalSunnyDay`, scene, undefined, undefined, undefined, () => resolve());
                 });
                 skyboxMaterial.reflectionTexture!.coordinatesMode = Texture.SKYBOX_MODE;
                 skyboxMaterial.diffuseColor = new Color3(0, 0, 0);
@@ -234,7 +222,7 @@ export class SceneBuilder implements ISceneBuilder {
             (async(): Promise<Mesh> => {
                 const groundMaterial = new StandardMaterial("groundMaterial", scene);
                 await new Promise<void>(resolve => {
-                    const groundTexture = new Texture("res/stage/beach/sand.jpg", scene, undefined, undefined, undefined, () => resolve());
+                    const groundTexture = new Texture(`${serverUrl}/stage/beach/sand.jpg`, scene, undefined, undefined, undefined, () => resolve());
                     groundTexture.vScale = groundTexture.uScale = 8.0;
                     groundMaterial.diffuseTexture = groundTexture;
                 });
@@ -250,7 +238,7 @@ export class SceneBuilder implements ISceneBuilder {
                 const water = new WaterMaterial("water", scene, new Vector2(1024, 1024));
                 water.backFaceCulling = true;
                 await new Promise<void>(resolve => {
-                    water.bumpTexture = new Texture("res/stage/beach/waterbump.png", scene, undefined, undefined, undefined, () => resolve());
+                    water.bumpTexture = new Texture(`${serverUrl}/stage/beach/waterbump.png`, scene, undefined, undefined, undefined, () => resolve());
                 });
                 water.windForce = -5;
                 water.waveHeight = 0.1;
@@ -273,14 +261,19 @@ export class SceneBuilder implements ISceneBuilder {
 
         scene.onAfterRenderObservable.addOnce(() => setTimeout(() => engine.hideLoadingUI(), 0));
 
+        mmdRuntime.timeScale = this._onConnectPacket.playerState.playbackRate;
+
+        const mmdPlayerControl = new MmdPlayerControl(scene, mmdRuntime, audioPlayer);
+        mmdPlayerControl.showPlayerControl();
+
         const animationMap = new Map<string, MmdWasmAnimation>();
         for (const mmdAnimation of mmdAnimations) {
             animationMap.set(mmdAnimation.name, mmdAnimation);
         }
 
         mmdRuntime.setCamera(mmdCamera);
-        if (this._sceneData.cameraMotion) {
-            const cameraAnimation = animationMap.get(this._sceneData.cameraMotion);
+        if (this._onConnectPacket.sceneData.cameraMotion) {
+            const cameraAnimation = animationMap.get(this._onConnectPacket.sceneData.cameraMotion);
             if (cameraAnimation !== undefined) {
                 mmdCamera.addAnimation(cameraAnimation);
                 mmdCamera.setAnimation(cameraAnimation.name);
@@ -294,7 +287,7 @@ export class SceneBuilder implements ISceneBuilder {
             for (const mesh of modelMesh.metadata.meshes) mesh.receiveShadows = true;
             shadowGenerator.addShadowCaster(modelMesh);
 
-            const modelData = this._sceneData.models[i];
+            const modelData = this._onConnectPacket.sceneData.models[i];
 
             const mmdModel = mmdRuntime.createMmdModel(modelMesh, {
                 buildPhysics: modelData.buildPhysics
@@ -309,7 +302,9 @@ export class SceneBuilder implements ISceneBuilder {
             mmdModels.push(mmdModel);
         }
 
-        await mmdRuntime.playAnimation();
+        await mmdRuntime.playAnimation().then(() => {
+            mmdRuntime.seekAnimation((Date.now() - this._onConnectPacket.playerState.playedTime) / 1000 * 30);
+        });
 
         // ammo js physics initialization is buggy...
         setTimeout(() => {
@@ -317,7 +312,7 @@ export class SceneBuilder implements ISceneBuilder {
                 (mmdRuntime as any)._needToInitializePhysicsModels.add(mmdModel);
                 // (mmdRuntime as any)._needToInitializePhysicsModelsBuffer.add(mmdModel);
             }
-        }, 1);
+        }, 10);
 
         water.addToRenderList(skybox);
         water.addToRenderList(ground);
@@ -348,6 +343,111 @@ export class SceneBuilder implements ISceneBuilder {
 
         for (const depthRenderer of Object.values(scene._depthRenderer)) {
             depthRenderer.forceDepthWriteTransparentMeshes = true;
+        }
+
+        if (!scene.isDisposed && !engine.isDisposed) {
+            const sceneClient = this._sceneClient;
+
+            let onResumeIgnoreCount = 0;
+            let onPauseIgnoreCount = 0;
+            let onSeekIgnoreCount = 0;
+
+            function syncPosition(position: number, requestTime: number): void {
+                const newPosition = position + (Date.now() - requestTime) / 1000 * 30;
+                if (2 < Math.abs(mmdRuntime.currentFrameTime - newPosition)) {
+                    onSeekIgnoreCount += 1;
+                    mmdRuntime.seekAnimation(newPosition, true);
+                }
+            }
+
+            const onPacket = (packet: Packet): void => {
+                switch (packet.kind) {
+                case PacketKind.OnResume: {
+                    if (packet.clientId !== sceneClient.clientId) {
+                        syncPosition(packet.position, packet.requestTime);
+                        onResumeIgnoreCount += 1;
+                        mmdRuntime.playAnimation();
+                    }
+                    break;
+                }
+                case PacketKind.OnPause: {
+                    if (packet.clientId !== sceneClient.clientId) {
+                        syncPosition(packet.position, packet.requestTime);
+                        onPauseIgnoreCount += 1;
+                        mmdRuntime.pauseAnimation();
+                    }
+                    break;
+                }
+                case PacketKind.OnSeek: {
+                    if (packet.clientId !== sceneClient.clientId) {
+                        syncPosition(packet.position, packet.requestTime);
+                    }
+                    break;
+                }
+                case PacketKind.OnPlaybackRateChange: {
+                    if (packet.clientId !== sceneClient.clientId) {
+                        syncPosition(packet.position, packet.requestTime);
+                        mmdPlayerControl.setPlaybackRate(packet.rate, false);
+                    }
+                    break;
+                }
+                }
+            };
+
+            mmdRuntime.onPlayAnimationObservable.add(() => {
+                if (0 < onResumeIgnoreCount) {
+                    onResumeIgnoreCount -= 1;
+                    return;
+                }
+                const packet: ResumePacket = {
+                    kind: PacketKind.Resume,
+                    position: mmdRuntime.currentFrameTime,
+                    requestTime: Date.now()
+                };
+                sceneClient.send(packet);
+            });
+
+            mmdRuntime.onPauseAnimationObservable.add(() => {
+                if (0 < onPauseIgnoreCount) {
+                    onPauseIgnoreCount -= 1;
+                    return;
+                }
+                const packet: PausePacket = {
+                    kind: PacketKind.Pause,
+                    position: mmdRuntime.currentFrameTime,
+                    requestTime: Date.now()
+                };
+                sceneClient.send(packet);
+            });
+
+            mmdRuntime.onSeekAnimationObservable.add(() => {
+                if (0 < onSeekIgnoreCount) {
+                    onSeekIgnoreCount -= 1;
+                    return;
+                }
+                const packet: SeekPacket = {
+                    kind: PacketKind.Seek,
+                    position: mmdRuntime.currentFrameTime,
+                    requestTime: Date.now()
+                };
+                sceneClient.send(packet);
+            });
+
+            mmdPlayerControl.onPlaybackRateChangedObservable.add(rate => {
+                const packet: PlaybackRateChangePacket = {
+                    kind: PacketKind.PlaybackRateChange,
+                    position: mmdRuntime.currentFrameTime,
+                    requestTime: Date.now(),
+                    rate
+                };
+                sceneClient.send(packet);
+            });
+
+            sceneClient.onPacketObservable.add(onPacket);
+
+            scene.onDisposeObservable.addOnce(() => {
+                sceneClient.onPacketObservable.removeCallback(onPacket);
+            });
         }
 
         return scene;

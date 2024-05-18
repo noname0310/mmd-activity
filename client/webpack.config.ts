@@ -1,4 +1,4 @@
-import copyWebpackPlugin from "copy-webpack-plugin";
+// import copyWebpackPlugin from "copy-webpack-plugin";
 import eslintPlugin from "eslint-webpack-plugin";
 import htmlWebpackPlugin from "html-webpack-plugin";
 import path from "path";
@@ -48,12 +48,12 @@ export default (env: any): webpack.Configuration & { devServer?: WebpackDevServe
             extensions: ["ts", "tsx"],
             fix: true,
             cache: true
-        }),
-        new copyWebpackPlugin({
-            patterns: [
-                { from: "res", to: "res" }
-            ]
         })
+        // new copyWebpackPlugin({
+        //     patterns: [
+        //         { from: "res", to: "res" }
+        //     ]
+        // })
     ],
     devServer: {
         host: "0.0.0.0",
