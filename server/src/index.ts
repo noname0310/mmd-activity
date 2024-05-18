@@ -1,29 +1,9 @@
 import type WebSocket from "ws";
 
-import type { MmdSceneData, OnConnectPacket, OnPausePacket, OnPlaybackRateChangePacket, OnResumePacket, OnSeekPacket, PlayerState } from "./packet";
+import type { OnConnectPacket, OnPausePacket, OnPlaybackRateChangePacket, OnResumePacket, OnSeekPacket, PlayerState } from "./packet";
 import { PacketKind } from "./packet";
+import { sceneData } from "./scene";
 import { Server } from "./server";
-
-const sceneData: MmdSceneData = {
-    settings: {
-        physics: true
-    },
-    audio: "/motion/daybreak_frontline.mp3",
-    models: [
-        {
-            path: "/model/YYB Vintage Hatsune Miku.bpmx",
-            motionPaths: [ "/motion/daybreak_frontline_a.bvmd" ],
-            buildPhysics: true
-        },
-        {
-            path: "/model/YYB Hatsune Miku_10th.bpmx",
-            motionPaths: [ "/motion/daybreak_frontline_b.bvmd" ],
-            buildPhysics: true
-        }
-    ],
-    cameraMotion: "/motion/daybreak_frontline_camera.bvmd",
-    endFrame: null
-};
 
 async function main(): Promise<void> {
     const playerState: PlayerState = {

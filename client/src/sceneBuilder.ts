@@ -266,6 +266,10 @@ export class SceneBuilder implements ISceneBuilder {
         const mmdPlayerControl = new MmdPlayerControl(scene, mmdRuntime, audioPlayer);
         mmdPlayerControl.showPlayerControl();
 
+        setTimeout(() => {
+            mmdPlayerControl.hidePlayerControl();
+        }, 5000);
+
         const animationMap = new Map<string, MmdWasmAnimation>();
         for (const mmdAnimation of mmdAnimations) {
             animationMap.set(mmdAnimation.name, mmdAnimation);
@@ -332,7 +336,7 @@ export class SceneBuilder implements ISceneBuilder {
         defaultPipeline.fxaaEnabled = true;
         defaultPipeline.imageProcessingEnabled = true;
         defaultPipeline.imageProcessing.toneMappingEnabled = true;
-        defaultPipeline.imageProcessing.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES;
+        defaultPipeline.imageProcessing.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_KHR_PBR_NEUTRAL;
         defaultPipeline.imageProcessing.vignetteWeight = 0.5;
         defaultPipeline.imageProcessing.vignetteStretch = 0.5;
         defaultPipeline.imageProcessing.vignetteColor = new Color4(0, 0, 0, 0);
