@@ -42,7 +42,6 @@ export class MmdPlayerControl {
     private _endFrameNumberSpan: HTMLSpanElement;
     private _speedLabel: HTMLLabelElement;
     private _speedSlider: HTMLInputElement;
-    private _fullscreenButton: HTMLButtonElement;
 
     private readonly _bindedDispose: () => void;
     private readonly _scene: Scene;
@@ -80,7 +79,6 @@ export class MmdPlayerControl {
         this._endFrameNumberSpan = null!;
         this._speedLabel = null!;
         this._speedSlider = null!;
-        this._fullscreenButton = null!;
 
         this._createPlayerControl(parentControl, mmdRuntime, audioPlayer);
         mmdRuntime.onPlayAnimationObservable.add(this._onAnimationPlay);
@@ -311,19 +309,6 @@ export class MmdPlayerControl {
                             speedLabel.innerText = mmdRuntime.timeScale.toFixed(2) + "x";
                         };
                         playerLowerRightContainer.appendChild(speedSlider);
-
-                        const fullscreenButton = this._fullscreenButton = ownerDocument.createElement("button");
-                        fullscreenButton.style.width = "40px";
-                        fullscreenButton.style.border = "none";
-                        fullscreenButton.style.color = "white";
-                        fullscreenButton.style.backgroundColor = "rgba(0, 0, 0, 0)";
-                        fullscreenButton.style.fontSize = "20px";
-                        fullscreenButton.innerText = "🗖";
-                        fullscreenButton.onclick = (): void => {
-                            if (ownerDocument.fullscreenElement) ownerDocument.exitFullscreen();
-                            else parentControl.requestFullscreen();
-                        };
-                        playerLowerRightContainer.appendChild(fullscreenButton);
                     }
                 }
             }
@@ -442,7 +427,6 @@ export class MmdPlayerControl {
         }
 
         this._speedSlider.oninput = null;
-        this._fullscreenButton.onclick = null;
 
         this._playerContainer.onmouseenter = null;
         this._playerContainer.onmouseleave = null;
