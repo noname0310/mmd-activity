@@ -29,7 +29,7 @@ async function initDiscordSdk(): Promise<void> {
         discordSdk = new DiscordSDK(DISCORD_CLIENT_ID);
         await discordSdk.ready();
         serverUrl.url = "server";
-        webSocketUrl = `wss://${location.host}:20310/server`;
+        webSocketUrl = `wss://${location.host}/server`;
     }
 }
 
