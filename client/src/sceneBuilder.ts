@@ -303,7 +303,15 @@ export class SceneBuilder implements ISceneBuilder {
             mmdModels.push(mmdModel);
         }
 
-        mmdRuntime.playAnimation();
+        await mmdRuntime.playAnimation();
+
+        // ammo js physics initialization is buggy...
+        setTimeout(() => {
+            for (const mmdModel of mmdRuntime.models) {
+                (mmdRuntime as any)._needToInitializePhysicsModels.add(mmdModel);
+                // (mmdRuntime as any)._needToInitializePhysicsModelsBuffer.add(mmdModel);
+            }
+        }, 1);
 
         water.addToRenderList(skybox);
         water.addToRenderList(ground);
