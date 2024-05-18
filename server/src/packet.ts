@@ -26,6 +26,7 @@ export interface MmdSceneData {
 
 export interface PlayerState {
     playing: boolean;
+    pausedPosition: number;
     playedTime: number;
     playbackRate: number;
 }
@@ -35,6 +36,7 @@ export interface OnConnectPacket {
     clientId: number;
     sceneData: MmdSceneData;
     playerState: PlayerState;
+    isFirstClient: boolean;
 }
 
 interface ExactSyncPacket {

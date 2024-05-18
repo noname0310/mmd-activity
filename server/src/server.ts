@@ -136,4 +136,8 @@ export class Server {
             }
         });
     }
+
+    public get connectedClients(): number {
+        return this._clients.length;
+    }
 }

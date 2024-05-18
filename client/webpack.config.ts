@@ -1,9 +1,18 @@
 // import copyWebpackPlugin from "copy-webpack-plugin";
+import dotenv from "dotenv";
 import eslintPlugin from "eslint-webpack-plugin";
+import fs from "fs";
 import htmlWebpackPlugin from "html-webpack-plugin";
 import path from "path";
 import type webpack from "webpack";
+import { DefinePlugin } from "webpack";
 import type { Configuration as WebpackDevServerConfiguration } from "webpack-dev-server";
+
+if (fs.existsSync(path.join(__dirname, ".env"))) {
+    dotenv.config({
+        path: path.join(__dirname, ".env")
+    });
+}
 
 export default (env: any): webpack.Configuration & { devServer?: WebpackDevServerConfiguration } => ({
     entry: "./src/index.ts",
@@ -48,12 +57,16 @@ export default (env: any): webpack.Configuration & { devServer?: WebpackDevServe
             extensions: ["ts", "tsx"],
             fix: true,
             cache: true
-        })
+        }),
         // new copyWebpackPlugin({
         //     patterns: [
         //         { from: "res", to: "res" }
         //     ]
         // })
+        new DefinePlugin({
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            DISCORD_CLIENT_ID: "\"" + process.env.DISCORD_CLIENT_ID + "\""
+        })
     ],
     devServer: {
         host: "0.0.0.0",

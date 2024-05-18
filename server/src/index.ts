@@ -8,6 +8,7 @@ import { Server } from "./server";
 async function main(): Promise<void> {
     const playerState: PlayerState = {
         playing: false,
+        pausedPosition: 0,
         playedTime: 0,
         playbackRate: 1
     };
@@ -18,11 +19,6 @@ async function main(): Promise<void> {
     let nextClientId = 0;
 
     server.onClientConnected = (socket): void => {
-        if (nextClientId === 0) {
-            playerState.playing = true;
-            playerState.playedTime = Date.now();
-        }
-
         const clientId = nextClientId;
         nextClientId += 1;
         clientIdMap.set(socket, clientId);
@@ -31,7 +27,8 @@ async function main(): Promise<void> {
             kind: PacketKind.OnConnect,
             clientId,
             sceneData,
-            playerState
+            playerState,
+            isFirstClient: server.connectedClients == 1
         };
         socket.send(JSON.stringify(onConnectPacket));
     };
@@ -40,6 +37,7 @@ async function main(): Promise<void> {
         console.log("received packet", packet);
         switch (packet.kind) {
         case PacketKind.Resume: {
+            playerState.pausedPosition = packet.position;
             playerState.playedTime = packet.requestTime - (packet.position / 30 * 1000);
             playerState.playing = true;
             const onResumePacket: OnResumePacket = {
@@ -52,6 +50,7 @@ async function main(): Promise<void> {
             break;
         }
         case PacketKind.Pause: {
+            playerState.pausedPosition = packet.position;
             playerState.playedTime = packet.requestTime - (packet.position / 30 * 1000);
             playerState.playing = false;
             const onPausePacket: OnPausePacket = {
@@ -64,6 +63,7 @@ async function main(): Promise<void> {
             break;
         }
         case PacketKind.Seek: {
+            playerState.pausedPosition = packet.position;
             playerState.playedTime = packet.requestTime - (packet.position / 30 * 1000);
             const seekPacket: OnSeekPacket = {
                 kind: PacketKind.OnSeek,
@@ -75,6 +75,8 @@ async function main(): Promise<void> {
             break;
         }
         case PacketKind.PlaybackRateChange: {
+            playerState.pausedPosition = packet.position;
+            playerState.playedTime = packet.requestTime - (packet.position / 30 * 1000);
             playerState.playbackRate = packet.rate;
             const playbackRateChangePacket: OnPlaybackRateChangePacket = {
                 kind: PacketKind.OnPlaybackRateChange,

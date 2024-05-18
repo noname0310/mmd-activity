@@ -54,8 +54,9 @@ import { optimizeScene } from "@/Util/optimizeScene";
 import type { SceneClient } from ".";
 import { serverUrl } from "./constant";
 import { MmdPlayerControl } from "./mmdPlayerControl";
-import type { OnConnectPacket, PausePacket, PlaybackRateChangePacket, ResumePacket, SeekPacket} from "./packet";
+import type { OnConnectPacket, PausePacket, PlaybackRateChangePacket, ResumePacket, SeekPacket } from "./packet";
 import {type Packet, PacketKind } from "./packet";
+import { createAmmoGround } from "./Util/createAmmoGround";
 
 export class SceneBuilder implements ISceneBuilder {
     private readonly _onConnectPacket: OnConnectPacket;
@@ -210,7 +211,7 @@ export class SceneBuilder implements ISceneBuilder {
                 const skyboxMaterial = new StandardMaterial("skyBox", scene);
                 skyboxMaterial.backFaceCulling = false;
                 await new Promise<void>(resolve => {
-                    skyboxMaterial.reflectionTexture = new CubeTexture(`${serverUrl}/stage/beach/TropicalSunnyDay`, scene, undefined, undefined, undefined, () => resolve());
+                    skyboxMaterial.reflectionTexture = new CubeTexture(`${serverUrl.url}/stage/beach/TropicalSunnyDay`, scene, undefined, undefined, undefined, () => resolve());
                 });
                 skyboxMaterial.reflectionTexture!.coordinatesMode = Texture.SKYBOX_MODE;
                 skyboxMaterial.diffuseColor = new Color3(0, 0, 0);
@@ -222,7 +223,7 @@ export class SceneBuilder implements ISceneBuilder {
             (async(): Promise<Mesh> => {
                 const groundMaterial = new StandardMaterial("groundMaterial", scene);
                 await new Promise<void>(resolve => {
-                    const groundTexture = new Texture(`${serverUrl}/stage/beach/sand.jpg`, scene, undefined, undefined, undefined, () => resolve());
+                    const groundTexture = new Texture(`${serverUrl.url}/stage/beach/sand.jpg`, scene, undefined, undefined, undefined, () => resolve());
                     groundTexture.vScale = groundTexture.uScale = 8.0;
                     groundMaterial.diffuseTexture = groundTexture;
                 });
@@ -238,7 +239,7 @@ export class SceneBuilder implements ISceneBuilder {
                 const water = new WaterMaterial("water", scene, new Vector2(1024, 1024));
                 water.backFaceCulling = true;
                 await new Promise<void>(resolve => {
-                    water.bumpTexture = new Texture(`${serverUrl}/stage/beach/waterbump.png`, scene, undefined, undefined, undefined, () => resolve());
+                    water.bumpTexture = new Texture(`${serverUrl.url}/stage/beach/waterbump.png`, scene, undefined, undefined, undefined, () => resolve());
                 });
                 water.windForce = -5;
                 water.waveHeight = 0.1;
@@ -306,9 +307,17 @@ export class SceneBuilder implements ISceneBuilder {
             mmdModels.push(mmdModel);
         }
 
-        await mmdRuntime.playAnimation().then(() => {
-            mmdRuntime.seekAnimation((Date.now() - this._onConnectPacket.playerState.playedTime) / 1000 * 30);
-        });
+        const groundCollider = createAmmoGround(scene);
+        groundCollider.position.y = -0.5;
+        groundCollider.isVisible = false;
+
+        if (this._onConnectPacket.playerState.playing) {
+            await mmdRuntime.playAnimation().then(() => {
+                mmdRuntime.seekAnimation((Date.now() - this._onConnectPacket.playerState.playedTime) / 1000 * 30);
+            });
+        } else {
+            mmdRuntime.seekAnimation(this._onConnectPacket.playerState.pausedPosition, true);
+        }
 
         // ammo js physics initialization is buggy...
         setTimeout(() => {
@@ -452,6 +461,10 @@ export class SceneBuilder implements ISceneBuilder {
             scene.onDisposeObservable.addOnce(() => {
                 sceneClient.onPacketObservable.removeCallback(onPacket);
             });
+
+            if (this._onConnectPacket.isFirstClient) {
+                mmdRuntime.playAnimation();
+            }
         }
 
         return scene;

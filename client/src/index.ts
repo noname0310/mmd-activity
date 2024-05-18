@@ -1,4 +1,5 @@
 import { Observable } from "@babylonjs/core/Misc/observable";
+import { DiscordSDK } from "@discord/embedded-app-sdk";
 
 import { Client } from "./client";
 import { serverUrl } from "./constant";
@@ -16,7 +17,25 @@ canvas.style.height = "100%";
 canvas.style.display = "block";
 document.body.appendChild(canvas);
 
-const client = await Client.CreateAndConnect("ws://localhost:20311");
+// eslint-disable-next-line @typescript-eslint/naming-convention
+declare const DISCORD_CLIENT_ID: string;
+
+let webSocketUrl = "ws://localhost:20311";
+async function initDiscordSdk(): Promise<void> {
+    const queryParams = new URLSearchParams(window.location.search);
+    const isEmbedded = queryParams.get("frame_id") !== null;
+    let discordSdk: DiscordSDK;
+    if (isEmbedded) {
+        discordSdk = new DiscordSDK(DISCORD_CLIENT_ID);
+        await discordSdk.ready();
+        serverUrl.url = "server";
+        webSocketUrl = `wss://${location.host}/server`;
+    }
+}
+
+await initDiscordSdk();
+
+const client = await Client.CreateAndConnect(webSocketUrl);
 
 export interface SceneClient {
     readonly clientId: number;
@@ -29,13 +48,13 @@ let runtime: Promise<BaseRuntime> | null = null;
 
 function loadScene(packet: OnConnectPacket): void {
     function resolveSceneDataUrl(sceneData: MmdSceneData): void {
-        sceneData.audio = serverUrl + sceneData.audio;
+        sceneData.audio = serverUrl.url + sceneData.audio;
         for (const model of sceneData.models) {
-            model.path = serverUrl + model.path;
-            model.motionPaths = model.motionPaths.map(path => serverUrl + path);
+            model.path = serverUrl.url + model.path;
+            model.motionPaths = model.motionPaths.map(path => serverUrl.url + path);
         }
         if (sceneData.cameraMotion !== null) {
-            sceneData.cameraMotion = serverUrl + sceneData.cameraMotion;
+            sceneData.cameraMotion = serverUrl.url + sceneData.cameraMotion;
         }
     }
     resolveSceneDataUrl(packet.sceneData);
