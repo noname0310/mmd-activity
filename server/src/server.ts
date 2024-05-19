@@ -1,5 +1,6 @@
 import cors from "cors";
 import express from "express";
+import expressStaticGzip from "express-static-gzip";
 import type http from "http";
 import WebSocket, { WebSocketServer } from "ws";
 
@@ -43,7 +44,7 @@ export class Server {
             credentials: true,
             origin: "*"
         }));
-        app.use("/", express.static("res"));
+        app.use("/", expressStaticGzip("res", { }));
 
         this._httpServer = app.listen(port, () => {
             console.log(`server is listening on port ${port}`);
